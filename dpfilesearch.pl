@@ -32,15 +32,20 @@ use Data::Dumper;
 use Getopt::Long;
 
 # -------------------------
-# Main
+# Global Variables
 # -------------------------
+my $omnidb = '/opt/omni/bin/omnidb';
+my %data = ();
 
+# -------------------------
+# Argument handling
+# -------------------------
 my( $filesystem, $label, $directory, $recursive );
 Getopt::Long::Configure("pass_through");
 GetOptions(
                 q{filesystem=s} => \$filesystem,
                 q{label=s} => \$label,
-                q{dir} => \$directory,
+                q{dir=s} => \$directory,
                 q{recursive!} => \$recursive,
 );
 
@@ -51,4 +56,36 @@ if ( !($filesystem || $label || $directory) ) {
 	usage "Not enough arguments." if (! @args );
 }
 
+# -------------------------
+# Methods
+# -------------------------
+sub pullDataFromDbWithDirectory {
+	my $_dir = $_[0];
+	my @list = ();
 
+	my @retval = grep { /dir|file/ } map { s/^Dir\s+|^File\s+|\n//g; $_ } qx($omnidb -filesystem $filesystem  '$label'  -listdir '$_dir');
+
+	foreach my $item (@retval) {
+		push(@list,$item) if $item =~ /^file/;
+		$data{"$_dir/$item"} = () if $item =~ /^dir/;;
+	}
+
+	$data{$_dir} = \@list;
+}
+
+sub printData {
+	foreach my $key (sort keys %data) {
+		print "$key\n";
+		foreach my $item (@{$data{$key}}) {
+			print "$key/$item\n";
+		}
+	}
+}
+
+
+
+# -------------------------
+# Main
+# -------------------------
+pullDataFromDbWithDirectory($directory);
+printData;
