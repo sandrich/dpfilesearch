@@ -20,6 +20,7 @@ print STDERR "\nERROR: $_[0]\nUsage:\n", <<"EndOfDescription";
 
 	 Optional Parameters:
 		--recursive			Recursive search
+		--maxCount			Maximum allowed item count. Default: 10000
 EndOfDescription
 exit 2
 }
@@ -30,12 +31,17 @@ exit 2
 use strict;
 use Data::Dumper;
 use Getopt::Long;
+use Carp;
+use IPC::Open3;
+use Term::ANSIColor;
 
 # -------------------------
 # Global Variables
 # -------------------------
 my $omnidb = '/opt/omni/bin/omnidb';
 my %data = ();
+my $maxNumberOfItems = 10000;
+my $itemCount = 0;
 
 # -------------------------
 # Argument handling
@@ -47,6 +53,7 @@ GetOptions(
                 q{label=s} => \$label,
                 q{dir=s} => \$directory,
                 q{recursive!} => \$recursive,
+				q{maxCount=i} => \$maxNumberOfItems
 );
 
 usage "Invalid argument(s)." if (grep {/^-/o } @ARGV);
@@ -66,8 +73,21 @@ sub pullDataFromDbWithDirectory {
 	my @retval = grep { /dir|file/ } map { s/^Dir\s+|^File\s+|\n//g; $_ } qx($omnidb -filesystem $filesystem  '$label'  -listdir '$_dir');
 
 	foreach my $item (@retval) {
-		push(@list,$item) if $item =~ /^file/;
-		$data{"$_dir/$item"} = () if $item =~ /^dir/;;
+		$itemCount++;
+
+		if ($itemCount le $maxNumberOfItems) {
+
+			push(@list,$item) if $item =~ /^file/;
+
+			if ($item =~ /^dir/) {
+				my $subdir = "$_dir/$item";
+				$data{$subdir} = ();
+
+				if ($recursive) {
+					pullDataFromDbWithDirectory($subdir);
+				}
+			}
+		}
 	}
 
 	$data{$_dir} = \@list;
@@ -80,6 +100,7 @@ sub printData {
 			print "$key/$item\n";
 		}
 	}
+	print colored ['red on_black'], "\nWARNING: Maximum item count of $maxNumberOfItems has been reached. Please adjust your filter\n";	
 }
 
 
