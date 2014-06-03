@@ -34,14 +34,19 @@ use Getopt::Long;
 use Carp;
 use IPC::Open3;
 use Term::ANSIColor;
+use threads;
+use Thread::Queue;
 
 # -------------------------
 # Global Variables
 # -------------------------
 my $omnidb = '/opt/omni/bin/omnidb';
-my %data = ();
+my @data :shared;
+my $maxNumberOfParallelJobs = 10;
 my $maxNumberOfItems = 10000;
 my $itemCount = 0;
+my $debug = 0;
+my $worker = Thread::Queue->new();
 
 # -------------------------
 # Argument handling
@@ -68,45 +73,47 @@ if ( !($filesystem || $label || $directory) ) {
 # -------------------------
 sub pullDataFromDbWithDirectory {
 	my $_dir = $_[0];
-	my @list = ();
 
-	my @retval = grep { /dir|file/ } map { s/^Dir\s+|^File\s+|\n//g; $_ } qx($omnidb -filesystem $filesystem  '$label'  -listdir '$_dir');
+	if ($itemCount <= $maxNumberOfItems) {
+		my @retval = grep { /dir|file/ } map { s/^Dir\s+|^File\s+|\n//g; $_ } qx($omnidb -filesystem $filesystem  '$label'  -listdir '$_dir');
 
-	foreach my $item (@retval) {
-		$itemCount++;
-
-		if ($itemCount le $maxNumberOfItems) {
-
-			push(@list,$item) if $item =~ /^file/;
+		foreach my $item (@retval) {
+			$itemCount++;
+			my $file = "$_dir/$item";
+			push(@data,$file);
 
 			if ($item =~ /^dir/) {
-				my $subdir = "$_dir/$item";
-				$data{$subdir} = ();
-
-				if ($recursive) {
-					pullDataFromDbWithDirectory($subdir);
-				}
+				$worker->enqueue($file);
+				print "Add $file to queue\n" if $debug;
 			}
 		}
 	}
+}
 
-	$data{$_dir} = \@list;
+sub doOperation () {
+	my $ithread = threads->tid();
+	while (my $folder = $worker->dequeue()) {
+		print "Read $folder from queue\n" if $debug;
+		pullDataFromDbWithDirectory($folder);
+	}
 }
 
 sub printData {
-	foreach my $key (sort keys %data) {
-		print "$key\n";
-		foreach my $item (@{$data{$key}}) {
-			print "$key/$item\n";
-		}
+	foreach my $file (sort @data) {
+		print "$file\n";
 	}
-	print colored ['red on_black'], "\nWARNING: Maximum item count of $maxNumberOfItems has been reached. Please adjust your filter\n";	
+
+	if ($itemCount > $maxNumberOfItems) {
+		print colored ['red on_black'], "\nWARNING: Maximum item count of $itemCount / $maxNumberOfItems has been reached. Please adjust your filter\n"; 
+	}
 }
-
-
 
 # -------------------------
 # Main
 # -------------------------
+my @threads = map threads->create(\&doOperation), 1 .. $maxNumberOfParallelJobs;
 pullDataFromDbWithDirectory($directory);
-printData;
+$worker->enqueue((undef) x $maxNumberOfParallelJobs);
+$_->join for @threads;
+
+printData();
