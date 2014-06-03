@@ -22,6 +22,7 @@ print STDERR "\nERROR: $_[0]\nUsage:\n", <<"EndOfDescription";
 		--recursive			Recursive search
 		--maxCount 10000	Maximum allowed item count
 		--threads 10		Maximul parallel jobs
+		--exclude dir		Can be specified muliple times
 EndOfDescription
 exit 2
 }
@@ -52,7 +53,7 @@ my @IDLE_THREADS :shared;
 # -------------------------
 # Argument handling
 # -------------------------
-my( $filesystem, $label, $directory, $recursive, $debug );
+my( $filesystem, $label, $directory, $recursive, $debug, @exclude );
 Getopt::Long::Configure("pass_through");
 GetOptions(
                 q{filesystem=s} => \$filesystem,
@@ -61,7 +62,8 @@ GetOptions(
                 q{recursive!} => \$recursive,
 				q{maxCount=i} => \$maxNumberOfItems,
 				q{threads=i} => \$maxNumberOfParallelJobs,
-				q{debug!} => \$debug
+				q{debug!} => \$debug,
+				q{exclude=s} => \@exclude
 );
 
 usage "Invalid argument(s)." if (grep {/^-/o } @ARGV);
@@ -84,11 +86,14 @@ sub pullDataFromDbWithDirectory {
 			$itemCount++;
 			(my $filename = $item) =~ s/^File\s+|^Dir\s+|\n//g;
 			my $file = "$_dir/$filename";
-			push(@data,$file);
+			
+			if (!($file ~~ @exclude)) {
+				push(@data,$file);
 
-			if ($item =~ /^Dir/) {
-				$worker->enqueue($file);
-				print "Add $file to queue\n" if $debug;
+				if ($item =~ /^Dir/) {
+					$worker->enqueue($file);
+					print "Add $file to queue\n" if $debug;
+				}
 			}
 		}
 	}
@@ -119,6 +124,7 @@ sub printData {
 # -------------------------
 # Main
 # -------------------------
+print "Exclude: " . Dumper(\@exclude) if $debug;
 my @threads = map threads->create(\&doOperation), 1 .. $maxNumberOfParallelJobs;
 pullDataFromDbWithDirectory($directory);
 
