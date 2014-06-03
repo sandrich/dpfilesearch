@@ -20,7 +20,8 @@ print STDERR "\nERROR: $_[0]\nUsage:\n", <<"EndOfDescription";
 
 	 Optional Parameters:
 		--recursive			Recursive search
-		--maxCount			Maximum allowed item count. Default: 10000
+		--maxCount 10000	Maximum allowed item count
+		--threads 10		Maximul parallel jobs
 EndOfDescription
 exit 2
 }
@@ -45,20 +46,21 @@ my @data :shared;
 my $maxNumberOfParallelJobs = 10;
 my $maxNumberOfItems = 10000;
 my $itemCount = 0;
-my $debug = 0;
 my $worker = Thread::Queue->new();
 
 # -------------------------
 # Argument handling
 # -------------------------
-my( $filesystem, $label, $directory, $recursive );
+my( $filesystem, $label, $directory, $recursive, $debug );
 Getopt::Long::Configure("pass_through");
 GetOptions(
                 q{filesystem=s} => \$filesystem,
                 q{label=s} => \$label,
                 q{dir=s} => \$directory,
                 q{recursive!} => \$recursive,
-				q{maxCount=i} => \$maxNumberOfItems
+				q{maxCount=i} => \$maxNumberOfItems,
+				q{threads=i} => \$maxNumberOfParallelJobs,
+				q{debug!} => \$debug
 );
 
 usage "Invalid argument(s)." if (grep {/^-/o } @ARGV);
@@ -75,14 +77,15 @@ sub pullDataFromDbWithDirectory {
 	my $_dir = $_[0];
 
 	if ($itemCount <= $maxNumberOfItems) {
-		my @retval = grep { /dir|file/ } map { s/^Dir\s+|^File\s+|\n//g; $_ } qx($omnidb -filesystem $filesystem  '$label'  -listdir '$_dir');
+		my @retval = grep { /^Dir|^File/ } qx($omnidb -filesystem $filesystem  '$label'  -listdir '$_dir');
 
 		foreach my $item (@retval) {
 			$itemCount++;
-			my $file = "$_dir/$item";
+			(my $filename = $item) =~ s/^File\s+|^Dir\s+|\n//g;
+			my $file = "$_dir/$filename";
 			push(@data,$file);
 
-			if ($item =~ /^dir/) {
+			if ($item =~ /^Dir/) {
 				$worker->enqueue($file);
 				print "Add $file to queue\n" if $debug;
 			}
@@ -93,7 +96,7 @@ sub pullDataFromDbWithDirectory {
 sub doOperation () {
 	my $ithread = threads->tid();
 	while (my $folder = $worker->dequeue()) {
-		print "Read $folder from queue\n" if $debug;
+		print "Read $folder from queue with thread $ithread\n" if $debug;
 		pullDataFromDbWithDirectory($folder);
 	}
 }
