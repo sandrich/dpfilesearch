@@ -47,6 +47,7 @@ my $maxNumberOfParallelJobs = 10;
 my $maxNumberOfItems = 10000;
 my $itemCount = 0;
 my $worker = Thread::Queue->new();
+my @IDLE_THREADS :shared;
 
 # -------------------------
 # Argument handling
@@ -95,10 +96,14 @@ sub pullDataFromDbWithDirectory {
 
 sub doOperation () {
 	my $ithread = threads->tid();
-	while (my $folder = $worker->dequeue()) {
+
+	do {
+		my $folder = $worker->dequeue();
 		print "Read $folder from queue with thread $ithread\n" if $debug;
-		pullDataFromDbWithDirectory($folder);
-	}
+        pullDataFromDbWithDirectory($folder);
+	} while ($worker->pending());
+
+	push(@IDLE_THREADS,$ithread);
 }
 
 sub printData {
@@ -116,6 +121,9 @@ sub printData {
 # -------------------------
 my @threads = map threads->create(\&doOperation), 1 .. $maxNumberOfParallelJobs;
 pullDataFromDbWithDirectory($directory);
+
+
+sleep 0.01 while (scalar @IDLE_THREADS < $maxNumberOfParallelJobs);
 $worker->enqueue((undef) x $maxNumberOfParallelJobs);
 $_->join for @threads;
 
