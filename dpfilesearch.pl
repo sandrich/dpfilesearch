@@ -75,6 +75,11 @@ if ( !($filesystem || $label || $directory) ) {
 	usage "Not enough arguments." if (! @args );
 }
 
+if ($maxNumberOfParallelJobs gt 10) {
+	$maxNumberOfParallelJobs = 10;
+	print STDERR colored ['red on_black'], "\nWARNING: Maximum allowed threads are 10.\n"; 
+}
+
 # -------------------------
 # Methods
 # -------------------------
@@ -119,7 +124,7 @@ sub printData {
 	}
 
 	if ($itemCount > $maxNumberOfItems) {
-		print colored ['red on_black'], "\nWARNING: Maximum item count of $itemCount / $maxNumberOfItems has been reached. Please adjust your filter\n"; 
+		print STDERR colored ['red on_black'], "\nWARNING: Maximum item count of $itemCount / $maxNumberOfItems has been reached. Please adjust your filter\n"; 
 	}
 }
 
