@@ -13,7 +13,7 @@ print STDERR "\nERROR: $_[0]\nUsage:\n", <<"EndOfDescription";
      $_filename
 
 	 Required Parameters:
-		--filesystem 'host:dir'		Filesystem with format host:fs
+		--object 'host:dir'		Filesystem with format host:fs
 						ex. server:/SHARED	
 		--label 'label'			Label
 		--dir 'directory'		Directory to search
@@ -57,7 +57,7 @@ my $filter = '.*';
 my( $filesystem, $label, $directory, $recursive, $debug, @exclude );
 Getopt::Long::Configure("pass_through");
 GetOptions(
-                q{filesystem=s} => \$filesystem,
+                q{object=s} => \$filesystem,
                 q{label=s} => \$label,
                 q{dir=s} => \$directory,
                 q{recursive!} => \$recursive,
