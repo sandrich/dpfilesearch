@@ -5,24 +5,55 @@ sub usage {
 #
 # Title       : dpfilesearch.pl
 #
-# Autor		  : Christian Sandrini
+# Author	  : Christian Sandrini
 #
 # Description :
 print STDERR "\nERROR: $_[0]\nUsage:\n", <<"EndOfDescription";
 
-     $_filename
+NAME
+	dpfilesearch.pl - Queries files and directories in Data Protector db
+
+SYNOPSIS
+	$_filename --object <Object> --label <Label> --dir <Directory> 
+				[--recursive] [--maxCount <count>] [--threads <Threads>] 
+				[--exclude <Directory>] [--filter <regexp>]
+
+DESCRIPTION
 
 	 Required Parameters:
-		--object 'host:dir'		Filesystem with format host:fs
-						ex. server:/SHARED	
-		--label 'label'			Label
-		--dir 'directory'		Directory to search
+		--object
+			Filesystem with format host:fs
+			ex. server:/SHARED	
+
+		--label
+			Label of the object
+
+		--dir
+			Directory to search
 
 	 Optional Parameters:
-		--recursive			Recursive search
-		--maxCount 10000	Maximum allowed item count
-		--threads 10		Maximul parallel jobs
-		--exclude dir		Can be specified muliple times
+		--recursive			
+			Recursive search
+
+		--maxCount
+			Maximum allowed item count. Default: 10000
+
+		--threads		
+			Amount of threads being used for search. Maximum allowed are 10. 
+
+		--exclude dir		
+			Can be specified muliple times
+
+		--filter
+			Any valid POSIX regular expression can be specified
+
+EXAMPLES
+
+	dpfilesearch.pl --object server:/pkgs/fs --label '/pkgs/fs' --dir '/pkgs/fs/dp/schema' --recursive --filter '.*_01_20.*.dmp'
+
+AUTHORS
+
+	Christian Sandrini
 EndOfDescription
 exit 2
 }
