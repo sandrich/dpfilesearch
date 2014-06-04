@@ -80,6 +80,8 @@ if ($maxNumberOfParallelJobs gt 10) {
 	print STDERR colored ['red on_black'], "\nWARNING: Maximum allowed threads are 10.\n"; 
 }
 
+$directory =~ s/\/$//g;
+
 # -------------------------
 # Methods
 # -------------------------
