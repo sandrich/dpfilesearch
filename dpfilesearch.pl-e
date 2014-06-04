@@ -49,6 +49,7 @@ my $maxNumberOfItems = 10000;
 my $itemCount = 0;
 my $worker = Thread::Queue->new();
 my @IDLE_THREADS :shared;
+my $filter = '.*';
 
 # -------------------------
 # Argument handling
@@ -63,7 +64,8 @@ GetOptions(
 				q{maxCount=i} => \$maxNumberOfItems,
 				q{threads=i} => \$maxNumberOfParallelJobs,
 				q{debug!} => \$debug,
-				q{exclude=s} => \@exclude
+				q{exclude=s} => \@exclude,
+				q{filter=s} => \$filter
 );
 
 usage "Invalid argument(s)." if (grep {/^-/o } @ARGV);
@@ -112,7 +114,7 @@ sub doOperation () {
 }
 
 sub printData {
-	foreach my $file (sort @data) {
+	foreach my $file (sort grep {$_ =~ /$filter/ } @data) {
 		print "$file\n";
 	}
 
