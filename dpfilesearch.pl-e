@@ -108,7 +108,7 @@ if ( !($filesystem || $label || $directory) ) {
 
 if ($maxNumberOfParallelJobs gt 10) {
 	$maxNumberOfParallelJobs = 10;
-	print STDERR colored ['red on_black'], "\nWARNING: Maximum allowed threads are 10.\n"; 
+	printError("Maximum allowed threads are 10"); 
 }
 
 # Remove trailing slash
@@ -117,30 +117,46 @@ $directory =~ s/\/$//g;
 # Make sure the object has colon 
 if (index($filesystem,':') == -1) {
 	usage "Object is not in a proper format.";
-} 
+}
 
 # -------------------------
 # Methods
 # -------------------------
+sub printError {
+	my $message = @_;
+
+	print STDERR colored ['red on_black'], "\nWARNING: $message\n";
+}
+
 sub pullDataFromDbWithDirectory {
 	my $_dir = $_[0];
 
 	if ($itemCount <= $maxNumberOfItems) {
-		my @retval = grep { /^Dir|^File/ } qx($omnidb -filesystem $filesystem  '$label'  -listdir '$_dir');
+		my @commandOutput = qx($omnidb -filesystem $filesystem  '$label'  -listdir '$_dir' 2>&1);
+		my ($rc) = ($?>>8);
 
-		foreach my $item (@retval) {
-			$itemCount++;
-			(my $filename = $item) =~ s/^File\s+|^Dir\s+|\n//g;
-			my $file = "$_dir/$filename";
+		if ($rc eq 0) {
+
+			my @retval = grep { /^Dir|^File/ } qx($omnidb -filesystem $filesystem  '$label'  -listdir '$_dir');
+
+			foreach my $item (@retval) {
+				$itemCount++;
+				(my $filename = $item) =~ s/^File\s+|^Dir\s+|\n//g;
+				my $file = "$_dir/$filename";
 			
-			if (!($file ~~ @exclude)) {
-				push(@data,$file);
+				if (!($file ~~ @exclude)) {
+					push(@data,$file);
 
-				if ($item =~ /^Dir/) {
-					$worker->enqueue($file);
-					print "Add $file to queue\n" if $debug;
+					if ($item =~ /^Dir/) {
+						$worker->enqueue($file);
+						print "Add $file to queue\n" if $debug;
+					}
 				}
 			}
+		} else {
+			print STDERR join('',@commandOutput);
+			threads->self->kill('KILL')->join;
+			exit $rc;
 		}
 	}
 }
@@ -170,6 +186,7 @@ sub printData {
 # -------------------------
 # Main
 # -------------------------
+$SIG{'KILL'} = sub { threads->exit() };
 print "Exclude: " . Dumper(\@exclude) if $debug;
 my @threads = map threads->create(\&doOperation), 1 .. $maxNumberOfParallelJobs;
 pullDataFromDbWithDirectory($directory);
