@@ -111,7 +111,13 @@ if ($maxNumberOfParallelJobs gt 10) {
 	print STDERR colored ['red on_black'], "\nWARNING: Maximum allowed threads are 10.\n"; 
 }
 
+# Remove trailing slash
 $directory =~ s/\/$//g;
+
+# Make sure the object has colon 
+if (index($filesystem,':') == -1) {
+	usage "Object is not in a proper format.";
+} 
 
 # -------------------------
 # Methods
