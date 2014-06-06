@@ -1,5 +1,7 @@
 Usage:
 ======
+HP DataProtector uses omnidb utility to query its backedup files and directories. With dpfilesearch.pl you can search through omnidb recursively using threads and filters.
+
 
 NAME
 -----
