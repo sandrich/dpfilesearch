@@ -1,5 +1,6 @@
 #!/usr/bin/perl -w
 BEGIN { our($_pathname,$_filename)=($0=~m#(.*)/([^/]+)$#)?($1,$2):(".",$0); push @INC,$_pathname; };
+
 sub usage {
 ################################################################
 #
@@ -64,8 +65,6 @@ exit 2
 use strict;
 use Data::Dumper;
 use Getopt::Long;
-use Carp;
-use IPC::Open3;
 use Term::ANSIColor;
 use threads;
 use Thread::Queue;
@@ -74,13 +73,14 @@ use Thread::Queue;
 # Global Variables
 # -------------------------
 my $omnidb = '/opt/omni/bin/omnidb';
-my @data :shared;
 my $maxNumberOfParallelJobs = 10;
 my $maxNumberOfItems = 10000;
 my $itemCount = 0;
 my $worker = Thread::Queue->new();
-my @IDLE_THREADS :shared;
 my $filter = '.*';
+
+# Shared variables
+my @data :shared;
 my $idle :shared = $maxNumberOfParallelJobs;
 
 # -------------------------
@@ -112,8 +112,12 @@ if ($maxNumberOfParallelJobs gt 10) {
 	printError("Maximum allowed threads are 10"); 
 }
 
+# set idle
+$idle = $maxNumberOfParallelJobs;
+
 # Remove trailing slash
 $directory =~ s/\/$//g;
+
 
 # Make sure the object has colon 
 if (index($filesystem,':') == -1) {
@@ -171,8 +175,6 @@ sub doOperation () {
         pullDataFromDbWithDirectory($folder);
 		{ lock $idle; ++$idle }
 	}
-
-	push(@IDLE_THREADS,$ithread);
 }
 
 sub printData {
@@ -193,12 +195,9 @@ print "Exclude: " . Dumper(\@exclude) if $debug;
 my @threads = map threads->create(\&doOperation), 1 .. $maxNumberOfParallelJobs;
 pullDataFromDbWithDirectory($directory);
 
-print "IDLE: $idle";
 sleep 1 until $idle < $maxNumberOfParallelJobs; ## Wait for (some) thr
 sleep 1 until $idle  == $maxNumberOfParallelJobs; ## wait until they a
 $worker->enqueue((undef) x $maxNumberOfParallelJobs);
 $_->join for @threads;
 
 printData();
-
-print "Still pending in queue: " . $worker->pending();
