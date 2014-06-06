@@ -81,6 +81,7 @@ my $itemCount = 0;
 my $worker = Thread::Queue->new();
 my @IDLE_THREADS :shared;
 my $filter = '.*';
+my $idle :shared = $maxNumberOfParallelJobs;
 
 # -------------------------
 # Argument handling
@@ -164,11 +165,12 @@ sub pullDataFromDbWithDirectory {
 sub doOperation () {
 	my $ithread = threads->tid();
 
-	do {
-		my $folder = $worker->dequeue();
+	while( my $folder = $worker->dequeue() ) {
+		{ lock $idle; --$idle }
 		print "Read $folder from queue with thread $ithread\n" if $debug;
         pullDataFromDbWithDirectory($folder);
-	} while ($worker->pending());
+		{ lock $idle; ++$idle }
+	}
 
 	push(@IDLE_THREADS,$ithread);
 }
@@ -191,9 +193,12 @@ print "Exclude: " . Dumper(\@exclude) if $debug;
 my @threads = map threads->create(\&doOperation), 1 .. $maxNumberOfParallelJobs;
 pullDataFromDbWithDirectory($directory);
 
-
-sleep 0.01 while (scalar @IDLE_THREADS < $maxNumberOfParallelJobs);
+print "IDLE: $idle";
+sleep 1 until $idle < $maxNumberOfParallelJobs; ## Wait for (some) thr
+sleep 1 until $idle  == $maxNumberOfParallelJobs; ## wait until they a
 $worker->enqueue((undef) x $maxNumberOfParallelJobs);
 $_->join for @threads;
 
 printData();
+
+print "Still pending in queue: " . $worker->pending();
