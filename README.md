@@ -54,3 +54,8 @@ AUTHORS
 --------
 
     Christian Sandrini
+
+SPECIAL THANKS
+--------------
+[BrowserUk](http://www.perlmonks.org/?node_id=1088862)
+[ikegami](http://stackoverflow.com/questions/24014663/where-do-i-have-to-undefine-queue-when-using-multithread/24021056?noredirect=1)
